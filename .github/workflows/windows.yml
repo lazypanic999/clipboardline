@@ -34,6 +34,7 @@ jobs:
           python ../scripts/prepare-windows-search-models.py --check
       - name: Shared version and parity guard tests
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           python ../scripts/check-release-version.py --require-windows
           python ../scripts/test-release-version.py
           python ../scripts/sync-windows-locales.py --check
