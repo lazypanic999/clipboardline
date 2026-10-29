@@ -110,8 +110,16 @@ class ReleaseVersionTests(unittest.TestCase):
         self.write("windows/node_modules/electron/package.json", {"version": "44.9.0"})
         with self.assertRaisesRegex(guard.ReleaseVersionError, "Electron 44.9.1"):
             guard.check_release_version(self.root, require_windows=True, require_installed_electron=True)
+        self.write("windows/node_modules/electron/package.json", {"version": "44.9.2"})
+        with self.assertRaisesRegex(guard.ReleaseVersionError, "Installed Windows Electron differs"):
+            guard.check_release_version(self.root, require_installed_electron=True)
         self.write("windows/node_modules/electron/package.json", {"version": "44.9.1"})
         self.assertEqual(guard.check_release_version(self.root, require_installed_electron=True), "1.7.2")
+        lock = json.loads((self.root / "windows/package-lock.json").read_text())
+        lock["packages"]["node_modules/electron"]["version"] = "44.9.2"
+        self.write("windows/package-lock.json", lock)
+        with self.assertRaisesRegex(guard.ReleaseVersionError, "versions differ"):
+            guard.check_release_version(self.root, require_windows=True)
 
     def test_missing_mac_version_is_rejected(self):
         self.write("upstream-state.json", {})
@@ -149,6 +157,16 @@ class ReleaseVersionTests(unittest.TestCase):
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 1)
         self.assertIn("windows/package.json", result.stderr)
+
+    def test_cli_require_installed_electron_rejects_safe_mismatch(self):
+        self.windows()
+        self.write("windows/node_modules/electron/package.json", {"version": "44.9.2"})
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--root", str(self.root),
+             "--require-windows", "--require-installed-electron"],
+            capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Installed Windows Electron differs", result.stderr)
 
     def test_cli_selected_publisher_version_cannot_bypass_shared_version(self):
         command = [sys.executable, str(SCRIPT), "--root", str(self.root), "--expected-version"]
